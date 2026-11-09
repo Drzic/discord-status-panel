@@ -1,0 +1,897 @@
+<!DOCTYPE html>
+<html lang="hr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Status Panel</title>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<style>
+:root { --bg: #0b0e14; --card: #131824; --line: rgba(255,255,255,.08); --text: #eef1f7; --muted: #8a93a6; --c: 88,101,242; --ok: 61,220,151; --idle: 245,184,74; --dnd: 255,72,96; }
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html { color-scheme: dark; }
+body { min-height: 100vh; background: radial-gradient(1200px 600px at 10% -10%, rgba(var(--c), .18), transparent 60%), var(--bg); color: var(--text); font-family: 'Outfit', system-ui, sans-serif; }
+button, input, select, textarea { font: inherit; color: inherit; }
+.hide { display: none !important; }
+/* prijava */
+.login { min-height: 100vh; display: grid; place-items: center; padding: 16px; }
+.login form { width: 100%; max-width: 360px; padding: 32px; border-radius: 20px; background: var(--card); border: 1px solid var(--line); box-shadow: 0 30px 80px rgba(0,0,0,.5); }
+.login h1 { font-size: 24px; margin-bottom: 6px; } .login p { color: var(--muted); font-size: 14px; margin-bottom: 20px; }
+.field { width: 100%; padding: 12px 14px; border-radius: 12px; background: rgba(255,255,255,.04); border: 1px solid var(--line); outline: none; transition: border-color .2s; }
+.field:focus { border-color: rgba(var(--c), .8); }
+.btn { padding: 11px 18px; border: 0; border-radius: 12px; background: rgb(var(--c)); font-weight: 700; cursor: pointer; transition: transform .1s, filter .2s; }
+.btn:hover { filter: brightness(1.12); } .btn:active { transform: scale(.97); }
+.btn.ghost { background: rgba(255,255,255,.06); } .btn.red { background: rgba(var(--dnd), .18); color: rgb(var(--dnd)); }
+.btn.sm { padding: 8px 12px; font-size: 13px; border-radius: 10px; }
+.err { color: rgb(var(--dnd)); font-size: 13px; min-height: 18px; margin-top: 10px; }
+/* panel */
+.wrap { max-width: 1180px; margin: 0 auto; padding: 28px 16px 60px; }
+header { display: flex; align-items: center; gap: 14px; margin-bottom: 24px; flex-wrap: wrap; }
+.logo { width: 44px; height: 44px; border-radius: 14px; display: grid; place-items: center; background: linear-gradient(135deg, rgb(var(--c)), #8b5cf6); font-weight: 800; }
+header h1 { font-size: 22px; } header small { color: var(--muted); }
+.stats { margin-left: auto; display: flex; gap: 10px; }
+.stat { padding: 10px 14px; border-radius: 12px; background: var(--card); border: 1px solid var(--line); text-align: center; min-width: 86px; }
+.stat b { display: block; font: 700 20px 'JetBrains Mono', monospace; } .stat span { font-size: 11px; color: var(--muted); letter-spacing: .12em; }
+.add { display: grid; grid-template-columns: 2fr 1fr 1fr 1.6fr 80px auto; gap: 10px; padding: 16px; border-radius: 16px; background: var(--card); border: 1px solid var(--line); margin-bottom: 22px; }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 14px; }
+.acc { padding: 16px; border-radius: 18px; background: var(--card); border: 1px solid var(--line); display: flex; flex-direction: column; gap: 12px; animation: up .3s ease both; }
+.acc.dirty { border-color: rgb(var(--idle)); }
+.acc.dirty [data-a="save"]::after { content: ' •'; }
+@keyframes up { from { opacity: 0; transform: translateY(8px); } }
+.acc-top { display: flex; align-items: center; gap: 12px; }
+.av { position: relative; width: 52px; height: 52px; flex-shrink: 0; }
+.av img { width: 52px; height: 52px; border-radius: 50%; object-fit: cover; background: #222a3a; }
+.dot { position: absolute; right: -2px; bottom: -2px; width: 18px; height: 18px; border-radius: 50%; border: 4px solid var(--card); background: #6b7280; }
+.dot.online { background: rgb(var(--ok)); } .dot.idle { background: rgb(var(--idle)); } .dot.dnd { background: rgb(var(--dnd)); } .dot.invisible { background: #6b7280; }
+.who { min-width: 0; flex: 1; } .who b { display: block; font-size: 16px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.who small { color: var(--muted); font-size: 12px; }
+.pill { font-size: 11px; font-weight: 700; padding: 4px 10px; border-radius: 999px; white-space: nowrap; }
+.pill.online { background: rgba(var(--ok), .15); color: rgb(var(--ok)); }
+.pill.connecting { background: rgba(var(--idle), .15); color: rgb(var(--idle)); }
+.pill.error { background: rgba(var(--dnd), .15); color: rgb(var(--dnd)); }
+.pill.stopped { background: rgba(255,255,255,.07); color: var(--muted); }
+.preview { padding: 10px 12px; border-radius: 12px; background: rgba(255,255,255,.03); font-size: 14px; color: #cfd5e2; min-height: 40px; }
+.row { display: grid; grid-template-columns: 1fr 1.6fr 64px 38px; gap: 8px; }
+.epick { padding: 0 !important; flex: 0 0 auto !important; }
+.cemoji { width: 20px; height: 20px; vertical-align: -4px; object-fit: contain; }
+.egrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(44px, 1fr)); gap: 6px; max-height: 300px; overflow-y: auto; margin-top: 12px; }
+.egrid button { aspect-ratio: 1; border: 1px solid transparent; border-radius: 10px; background: rgba(255,255,255,.04); cursor: pointer; display: grid; place-items: center; padding: 4px; }
+.egrid button:hover { border-color: rgb(var(--c)); background: rgba(var(--c), .15); }
+.egrid img { width: 32px; height: 32px; object-fit: contain; }
+.acts { display: flex; gap: 8px; flex-wrap: wrap; }
+.acts .btn { flex: 1; }
+.adv { border-radius: 12px; background: rgba(255,255,255,.025); padding: 0 12px; }
+.adv summary { cursor: pointer; padding: 10px 0; font-size: 13px; color: var(--muted); list-style: none; }
+.adv summary::before { content: '▸ '; } .adv[open] summary::before { content: '▾ '; }
+.adv[open] { padding-bottom: 12px; }
+.adv label { display: block; font-size: 12px; color: var(--muted); margin: 10px 0 5px; }
+.adv textarea { resize: vertical; font-family: inherit; }
+.row2 { display: grid; grid-template-columns: 1fr 1.6fr; gap: 8px; align-items: center; }
+.chk { display: flex !important; align-items: center; gap: 8px; margin: 0 !important; color: var(--text) !important; font-size: 13px !important; }
+.hint { color: var(--muted); font-size: 11px; }
+.vrow { display: flex; align-items: center; gap: 6px; padding: 8px 10px; border-radius: 12px; background: rgba(255,255,255,.025); }
+.vrow .vname { flex: 1; min-width: 0; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.vrow .btn { flex: 0 0 auto !important; }
+.vt.offv { background: rgba(var(--dnd), .18); color: rgb(var(--dnd)); }
+.vmodal { position: fixed; inset: 0; z-index: 60; background: rgba(0,0,0,.6); display: grid; place-items: center; padding: 16px; }
+.vmodal .box { width: 100%; max-width: 420px; background: var(--card); border: 1px solid var(--line); border-radius: 18px; padding: 22px; box-shadow: 0 30px 80px rgba(0,0,0,.6); }
+.vmodal h3 { margin-bottom: 4px; } .vmodal label.t { display: block; font-size: 12px; color: var(--muted); margin: 14px 0 6px; }
+.vmodal .acts2 { display: flex; justify-content: flex-end; gap: 8px; margin-top: 18px; }
+.vmodal .togs { display: flex; gap: 16px; margin-top: 14px; }
+.sch-list { display: flex; flex-direction: column; gap: 4px; }
+.sch { display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-radius: 10px; background: rgba(255,255,255,.03); font-size: 13px; }
+.sch.off { opacity: .45; }
+.sch .grow { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sch .btn { padding: 4px 8px; flex: 0 0 auto !important; }
+.mono { font-family: 'JetBrains Mono', monospace; }
+.sd { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 5px; background: #6b7280; }
+.sd.online { background: rgb(var(--ok)); } .sd.idle { background: rgb(var(--idle)); } .sd.dnd { background: rgb(var(--dnd)); }
+.days { display: flex; gap: 4px; margin-top: 8px; flex-wrap: wrap; }
+.days label { margin: 0 !important; cursor: pointer; }
+.days input { display: none; }
+.days span { display: inline-block; padding: 6px 9px; border-radius: 8px; background: rgba(255,255,255,.04); color: var(--muted); font-size: 12px; font-weight: 600; }
+.days input:checked + span { background: rgba(var(--c), .25); color: var(--text); }
+.empty { padding: 50px; text-align: center; color: var(--muted); border: 1px dashed var(--line); border-radius: 18px; }
+.toast { position: fixed; right: 16px; bottom: 16px; padding: 12px 16px; border-radius: 12px; background: #1b2232; border: 1px solid var(--line); box-shadow: 0 20px 40px rgba(0,0,0,.4); transform: translateY(20px); opacity: 0; transition: .25s; }
+.toast.show { transform: none; opacity: 1; } .toast.bad { border-color: rgba(var(--dnd), .5); }
+.imp { margin-bottom: 22px; background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 0 16px; }
+.imp[open] { padding-bottom: 16px; }
+.implog { margin-top: 12px; max-height: 260px; overflow-y: auto; padding: 10px 12px; border-radius: 10px; background: rgba(0,0,0,.3); font: 12px/1.5 'JetBrains Mono', monospace; white-space: pre-wrap; color: #cfd5e2; }
+/* poruke */
+.chat { position: fixed; inset: 0; z-index: 50; display: grid; grid-template-columns: 72px 240px 1fr; background: var(--bg); }
+.rail { background: #090c11; padding: 12px 0; display: flex; flex-direction: column; align-items: center; gap: 8px; overflow-y: auto; border-right: 1px solid var(--line); }
+.gicon { width: 48px; height: 48px; flex-shrink: 0; border-radius: 50%; display: grid; place-items: center; background: var(--card); cursor: pointer; font-weight: 700; font-size: 14px; overflow: hidden; transition: border-radius .2s, background .2s; position: relative; }
+.gicon img { width: 100%; height: 100%; object-fit: cover; }
+.gicon:hover, .gicon.on { border-radius: 16px; background: rgb(var(--c)); }
+.gicon.on::before { content: ''; position: absolute; left: -12px; width: 4px; height: 36px; border-radius: 0 4px 4px 0; background: #fff; }
+.rail hr { width: 32px; border: 0; border-top: 2px solid var(--line); }
+.chans { background: #0f131c; border-right: 1px solid var(--line); display: flex; flex-direction: column; min-height: 0; }
+.chans h3 { padding: 16px; font-size: 15px; border-bottom: 1px solid var(--line); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.chlist { overflow-y: auto; padding: 8px; flex: 1; }
+.cat { font-size: 11px; font-weight: 700; letter-spacing: .08em; color: var(--muted); text-transform: uppercase; margin: 14px 8px 4px; }
+.ch { display: flex; align-items: center; gap: 8px; padding: 7px 10px; border-radius: 8px; color: var(--muted); cursor: pointer; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ch:hover { background: rgba(255,255,255,.04); color: var(--text); } .ch.on { background: rgba(var(--c), .2); color: var(--text); }
+.ch.locked { opacity: .45; } .ch.locked:hover { opacity: .7; }
+.vmode { display: flex; gap: 4px; margin: 10px 8px 0; padding: 3px; border-radius: 10px; background: rgba(255,255,255,.04); }
+.vmode button { flex: 1; border: 0; background: none; padding: 6px; border-radius: 8px; font-size: 12px; color: var(--muted); cursor: pointer; }
+.vmode button.on { background: rgba(var(--c), .25); color: var(--text); }
+.ch img { width: 26px; height: 26px; border-radius: 50%; }
+.main { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+.mhead { display: flex; align-items: center; gap: 10px; padding: 12px 16px; border-bottom: 1px solid var(--line); }
+.mhead b { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mhead .back { display: none; }
+.msgs { flex: 1; overflow-y: auto; padding: 16px 0; }
+.msg { display: grid; grid-template-columns: 40px 1fr; gap: 12px; padding: 6px 16px; position: relative; }
+.msg:hover { background: rgba(255,255,255,.025); }
+.msg > img { width: 40px; height: 40px; border-radius: 50%; }
+.msg .meta { font-size: 13px; } .msg .meta b { font-size: 15px; margin-right: 6px; } .msg .meta span { color: var(--muted); font-size: 11px; }
+.msg .meta i { font-style: normal; font-size: 10px; padding: 1px 5px; border-radius: 4px; background: rgb(var(--c)); margin-right: 6px; }
+.msg .txt { white-space: pre-wrap; word-break: break-word; font-size: 15px; line-height: 1.4; color: #dbe0ea; }
+.msg .txt small { color: var(--muted); font-size: 11px; }
+.msg .rep { font-size: 12px; color: var(--muted); margin-bottom: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.msg .rep::before { content: '↱ '; }
+.msg .att img { max-width: min(360px, 100%); max-height: 280px; border-radius: 8px; margin-top: 6px; display: block; }
+.msg .att a { color: rgb(var(--c)); font-size: 13px; }
+.emb { margin-top: 6px; padding: 8px 12px; border-left: 4px solid rgb(var(--c)); border-radius: 4px; background: rgba(255,255,255,.04); font-size: 13px; max-width: 520px; white-space: pre-wrap; }
+.reacts { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
+.react { padding: 2px 8px; border-radius: 8px; background: rgba(255,255,255,.06); border: 1px solid transparent; font-size: 13px; cursor: pointer; }
+.react.me { background: rgba(var(--c), .2); border-color: rgba(var(--c), .7); }
+.mtools { position: absolute; right: 16px; top: -10px; display: none; gap: 2px; padding: 3px; border-radius: 8px; background: #1b2232; border: 1px solid var(--line); }
+.msg:hover .mtools { display: flex; }
+.mtools button { border: 0; background: none; padding: 4px 7px; border-radius: 6px; cursor: pointer; font-size: 13px; }
+.mtools button:hover { background: rgba(255,255,255,.08); }
+.compose { padding: 0 16px 16px; }
+.replybar { display: flex; align-items: center; gap: 8px; padding: 8px 12px; font-size: 13px; color: var(--muted); background: #141a26; border-radius: 12px 12px 0 0; }
+.replybar span { flex: 1; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.replybar button { border: 0; background: none; cursor: pointer; color: var(--muted); }
+.cbox { display: flex; gap: 8px; align-items: flex-end; }
+.cbox textarea { resize: none; max-height: 160px; font-family: inherit; line-height: 1.4; }
+.replybar:not(.hide) + .cbox textarea { border-top-left-radius: 0; border-top-right-radius: 0; }
+.cempty { margin: auto; color: var(--muted); text-align: center; padding: 40px; }
+@media (max-width: 760px) {
+    .chat { grid-template-columns: 60px 1fr; }
+    .gicon { width: 42px; height: 42px; }
+    .chat.inch .chans { display: none; } .chat:not(.inch) .main { display: none; }
+    .mhead .back { display: inline-block; }
+    .mtools { display: flex; position: static; margin-top: 4px; width: max-content; }
+}
+@media (max-width: 760px) { .add { grid-template-columns: 1fr 1fr; } .stats { margin-left: 0; } .grid { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<div class="login" id="login">
+    <form id="loginForm">
+        <h1>Status Panel</h1>
+        <p>Prijavi se lozinkom panela.</p>
+        <input class="field" type="password" id="pass" placeholder="Lozinka" autofocus>
+        <button class="btn" style="width:100%;margin-top:12px">Prijava</button>
+        <div class="err" id="loginErr"></div>
+    </form>
+</div>
+
+<div class="wrap hide" id="panel">
+    <header>
+        <div class="logo">S</div>
+        <div><h1>Status Panel</h1><small>Discord custom status 24/7</small></div>
+        <div class="stats">
+            <div class="stat"><b id="sOn">0</b><span>SPOJENO</span></div>
+            <div class="stat"><b id="sAll">0</b><span>RAČUNA</span></div>
+            <button class="btn ghost sm" id="logout">Odjava</button>
+        </div>
+    </header>
+
+    <form class="add" id="addForm">
+        <input class="field" id="aToken" type="password" placeholder="Token računa" autocomplete="off">
+        <input class="field" id="aLabel" placeholder="Naziv (neobavezno)">
+        <select class="field" id="aStatus"><option value="online">Online</option><option value="idle">Idle</option><option value="dnd">Ne ometaj</option><option value="invisible">Nevidljiv</option></select>
+        <input class="field" id="aText" placeholder="Custom status tekst">
+        <input class="field" id="aEmoji" placeholder="😀" maxlength="8">
+        <button class="btn">Dodaj</button>
+    </form>
+
+    <details class="adv imp">
+        <summary>Uvoz backupa servera na tvoj Discord</summary>
+        <label>1. Backup datoteka (⤓ Backup servera u Porukama)</label>
+        <input class="field" type="file" id="iFile" accept=".json,application/json">
+        <label>2. Račun iz panela koji radi uvoz (mora biti vlasnik ili imati Administrator na tvom serveru)</label>
+        <select class="field" id="iAcc"><option value="">— odaberi račun —</option></select>
+        <label>Što uvesti</label>
+        <select class="field" id="iMode">
+            <option value="all">Sve: rangovi, kategorije i kanali</option>
+            <option value="colors">Samo boje rangova (na moje postojeće rangove istog imena)</option>
+        </select>
+        <label>3. Tvoj server</label>
+        <div class="row2"><select class="field" id="iGuild"><option value="">— prvo odaberi račun —</option></select><button class="btn" id="iStart" type="button">Uvezi</button></div>
+        <pre class="implog hide" id="iLog"></pre>
+    </details>
+
+    <details class="adv imp" id="join">
+        <summary>Ubaci račun na server (OAuth, bez tokena i captche)</summary>
+        <div id="jSetup" class="hide">
+            <p class="hint" style="margin-top:10px">Prvo u <b>config.json</b> upiši <span class="mono">oauth_client_id</span>, <span class="mono">oauth_client_secret</span>, <span class="mono">bot_token</span> i <span class="mono">public_url</span> svoje aplikacije, pa restartaj panel.</p>
+        </div>
+        <div id="jReady" class="hide">
+            <label>1. Link za autorizaciju: otvori ga u pregledniku gdje je prijavljen račun i klikni <b>Authorize</b> (jednom po računu, link vrijedi 24 h)</label>
+            <div class="row2" style="grid-template-columns:1fr auto"><input class="field mono" id="jUrl" readonly><button class="btn sm" id="jCopy" type="button">Kopiraj</button></div>
+            <p class="hint" style="margin-top:6px">Redirect URL u Developer Portalu (OAuth2 → Redirects): <span class="mono" id="jRedirect"></span></p>
+            <label>2. Server (bot mora biti na njemu i imati dozvolu Create Invite)</label>
+            <select class="field" id="jGuild"><option value="">Učitavanje…</option></select>
+            <label>3. Autorizirani računi</label>
+            <div class="sch-list" id="jUsers"></div>
+            <button class="btn ghost sm" id="jRefresh" type="button" style="margin-top:8px">↻ Osvježi popis</button>
+        </div>
+    </details>
+
+    <div class="grid" id="list"></div>
+</div>
+
+<div class="chat hide" id="chat">
+    <nav class="rail" id="cRail"></nav>
+    <aside class="chans">
+        <h3 id="cTitle">Poruke</h3>
+        <div class="vmode hide" id="cMode"><button data-v="0" class="on">Normalno</button><button data-v="1">Svi kanali</button></div>
+        <div class="chlist" id="cList"></div>
+    </aside>
+    <section class="main">
+        <div class="mhead">
+            <button class="btn ghost sm back" id="cBack">‹</button>
+            <b id="cName">Odaberi kanal</b>
+            <span class="hint" id="cWho"></span>
+            <button class="btn ghost sm hide" id="cBackup" title="Rangovi, kategorije i kanali (bez tiketa i poruka)">⤓ Backup servera</button>
+            <button class="btn ghost sm" id="cClose">Zatvori</button>
+        </div>
+        <div class="msgs" id="cMsgs"><div class="cempty">Odaberi server i kanal lijevo.</div></div>
+        <div class="compose">
+            <div class="replybar hide" id="cReply"><span></span><button id="cReplyX">✕</button></div>
+            <div class="cbox">
+                <textarea class="field" id="cInput" rows="1" placeholder="Poruka…" disabled></textarea>
+                <button class="btn" id="cSend" disabled>Pošalji</button>
+            </div>
+        </div>
+    </section>
+</div>
+
+<div class="vmodal hide" id="vModal">
+    <div class="box">
+        <h3>🎧 Voice</h3>
+        <small class="hint" id="vWho"></small>
+        <label class="t">Server</label>
+        <select class="field" id="vGuild"></select>
+        <label class="t">Glasovni kanal</label>
+        <select class="field" id="vChan"><option value="">— prvo odaberi server —</option></select>
+        <div class="togs">
+            <label class="chk"><input type="checkbox" id="vMute"> 🎙️ ugašen mikrofon</label>
+            <label class="chk"><input type="checkbox" id="vDeaf"> 🎧 ugašen zvučnik</label>
+        </div>
+        <div class="acts2"><button class="btn ghost" id="vNo">Odustani</button><button class="btn" id="vGo">Uđi</button></div>
+    </div>
+</div>
+
+<div class="vmodal hide" id="eModal">
+    <div class="box" style="max-width:480px">
+        <h3>✨ Emoji sa servera</h3>
+        <small class="hint">Custom i animirani emoji u statusu rade samo ako račun ima <b>Nitro</b> i ako je na tom serveru.</small>
+        <label class="t">Server</label>
+        <select class="field" id="eGuild"></select>
+        <div class="egrid" id="eGrid"></div>
+        <div class="acts2"><button class="btn ghost" id="eClear">Makni emoji</button><button class="btn ghost" id="eClose">Zatvori</button></div>
+    </div>
+</div>
+
+<div class="vmodal hide" id="nModal">
+    <div class="box">
+        <h3>✏️ Ime računa</h3>
+        <small class="hint" id="nWho"></small>
+        <label class="t">Prikazno ime (vide ga svi · prazno = koristi korisničko ime)</label>
+        <div class="row2" style="grid-template-columns:1fr auto"><input class="field" id="nGlobal" maxlength="32"><button class="btn sm" id="nGlobalSave">Spremi</button></div>
+        <label class="t">Nadimak na serveru</label>
+        <select class="field" id="nGuild"><option value="">Učitavanje…</option></select>
+        <div class="row2" style="grid-template-columns:1fr auto;margin-top:8px"><input class="field" id="nNick" maxlength="32" placeholder="prazno = makni nadimak"><button class="btn sm" id="nNickSave">Spremi</button></div>
+        <label class="t">Korisničko ime (@ime) · Discord ga dopušta mijenjati rijetko</label>
+        <input class="field" id="nUser" maxlength="32">
+        <input class="field" id="nPass" type="password" placeholder="Lozinka računa (traži je Discord, ne sprema se)" autocomplete="new-password" style="margin-top:8px">
+        <button class="btn ghost sm" id="nUserSave" style="width:100%;margin-top:8px">Promijeni korisničko ime</button>
+        <div class="acts2"><button class="btn ghost" id="nClose">Zatvori</button></div>
+    </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const STATE = { online: 'Spojen', connecting: 'Spajanje…', error: 'Greška', stopped: 'Isključen' };
+const ST = { online: 'Online', idle: 'Idle', dnd: 'Ne ometaj', invisible: 'Nevidljiv' };
+const PLAT = { desktop: '🖥️ Računalo', mobile: '📱 Mobitel', web: '🌐 Web' };
+const ACT = { '-1': 'Bez aktivnosti', 0: 'Igra', 2: 'Sluša', 3: 'Gleda', 5: 'Natječe se u' };
+const DAYS = ['Pon', 'Uto', 'Sri', 'Čet', 'Pet', 'Sub', 'Ned'];
+function daysLabel(s) {
+    if (s === '0123456') return 'svaki dan';
+    if (s === '01234') return 'pon–pet';
+    if (s === '56') return 'vikend';
+    return [...s].map(i => DAYS[+i]).join(', ');
+}
+const openAdv = new Set();
+let ACCS = [];   // otvoreni "Napredno" ostaju otvoreni nakon osvjezavanja
+let editing = null;
+const dirty = new Set();     // kartice s nespremljenim promjenama
+
+async function api(method, url, body) {
+    const r = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: body ? JSON.stringify(body) : undefined, credentials: 'same-origin' });
+    let d = {}; try { d = await r.json(); } catch (e) {}
+    if (r.status === 401 && url !== '/login') showLogin();
+    return d;
+}
+function toast(msg, bad) {
+    const t = $('#toast'); t.textContent = msg; t.className = 'toast show' + (bad ? ' bad' : '');
+    clearTimeout(t._h); t._h = setTimeout(() => t.className = 'toast', 3000);
+}
+function showLogin() { $('#login').classList.remove('hide'); $('#panel').classList.add('hide'); }
+function showPanel() { $('#login').classList.add('hide'); $('#panel').classList.remove('hide'); load(); }
+function uptime(s) {
+    if (!s) return '';
+    const m = Math.floor((Date.now() / 1000 - s) / 60);
+    return m < 60 ? `${m} min` : m < 1440 ? `${Math.floor(m / 60)} h ${m % 60} min` : `${Math.floor(m / 1440)} d ${Math.floor(m % 1440 / 60)} h`;
+}
+function avatar(a) {
+    return a.avatar ? `https://cdn.discordapp.com/avatars/${a.user_id}/${a.avatar}.png?size=128` : `https://cdn.discordapp.com/embed/avatars/${(Number(a.user_id || 0) >> 22) % 6}.png`;
+}
+
+async function load() {
+    const d = await api('GET', '/api/accounts');
+    if (!d.ok) return;
+    $('#sAll').textContent = d.accounts.length;
+    $('#sOn').textContent = d.accounts.filter(a => a.state === 'online').length;
+    ACCS = d.accounts;
+    if (!d.accounts.length) { $('#list').innerHTML = '<div class="empty">Još nema računa. Dodaj token gore.</div>'; return; }
+    $('#list').innerHTML = d.accounts.map(a => `
+        <div class="acc" data-id="${a.id}">
+            <div class="acc-top">
+                <div class="av"><img src="${avatar(a)}"><i class="dot ${a.state === 'online' ? a.status : ''}"></i></div>
+                <div class="who"><b>${esc(a.label || a.username)}</b><small>${esc(a.username)} · ${esc(a.token)}${a.state === 'online' ? ' · ' + uptime(a.since) : ''}</small></div>
+                <span class="pill ${a.state}" title="${esc(a.error || '')}">${STATE[a.state] || a.state}</span>
+            </div>
+            <div class="preview">${a.emoji ? emojiHtml(a.emoji) + ' ' : ''}${esc((a.now && a.now.custom_status) || a.custom_status) || '<span style="color:var(--muted)">bez custom statusa</span>'}${a.act_type >= 0 && a.act_name ? `<br><small style="color:var(--muted)">${ACT[a.act_type]} <b>${esc(a.act_name)}</b></small>` : ''}${a.state === 'error' ? `<br><small style="color:rgb(var(--dnd))">${esc(a.error)}</small>` : ''}</div>
+            <div class="row">
+                <select class="field" data-f="status">${Object.entries(ST).map(([k, v]) => `<option value="${k}" ${k === a.status ? 'selected' : ''}>${v}</option>`).join('')}</select>
+                <input class="field" data-f="custom_status" value="${esc(a.custom_status)}" placeholder="Custom status">
+                <input class="field" data-f="emoji" value="${esc(a.emoji)}" placeholder="😀" maxlength="80">
+                <button class="btn ghost sm epick" data-a="e_pick" data-t='[data-f="emoji"]' title="Emoji sa servera (i animirani)">✨</button>
+            </div>
+            <div class="vrow">
+                ${a.voice.channel ? `<span class="vname" title="${esc(a.voice.name)}">🔊 ${esc(a.voice.name || 'u voiceu')}</span>
+                    <button class="btn ghost sm vt ${a.voice.mute ? 'offv' : ''}" data-a="v_mute" title="${a.voice.mute ? 'Uključi mikrofon' : 'Ugasi mikrofon'}">${a.voice.mute ? '🎙️✕' : '🎙️'}</button>
+                    <button class="btn ghost sm vt ${a.voice.deaf ? 'offv' : ''}" data-a="v_deaf" title="${a.voice.deaf ? 'Uključi zvučnik' : 'Ugasi zvučnik'}">${a.voice.deaf ? '🎧✕' : '🎧'}</button>
+                    <button class="btn ghost sm" data-a="v_pick" title="Drugi kanal">⇄</button>
+                    <button class="btn red sm" data-a="v_leave">Izađi</button>`
+                : `<span class="vname" style="color:var(--muted)">Nije u voiceu</span><button class="btn ghost sm" data-a="v_pick">🎧 Uđi u voice</button>`}
+            </div>
+            <details class="adv" data-k="adv" ${openAdv.has(a.id + ':adv') ? 'open' : ''}>
+                <summary>Napredno · ${PLAT[a.platform] || 'Računalo'}${a.act_type >= 0 && a.act_name ? ' · ' + (ACT[a.act_type] || '') + ' ' + esc(a.act_name) : ''}${a.rot_minutes > 0 ? ' · rotacija ' + a.rot_minutes + ' min' : ''}</summary>
+                <label>Platforma (ikona kod imena)</label>
+                <select class="field" data-f="platform">${Object.entries(PLAT).map(([k, v]) => `<option value="${k}" ${k === a.platform ? 'selected' : ''}>${v}</option>`).join('')}</select>
+                <label>Aktivnost</label>
+                <div class="row2">
+                    <select class="field" data-f="act_type">${Object.entries(ACT).map(([k, v]) => `<option value="${k}" ${+k === a.act_type ? 'selected' : ''}>${v}</option>`).join('')}</select>
+                    <input class="field" data-f="act_name" value="${esc(a.act_name)}" placeholder="npr. Minecraft / Spotify / YouTube">
+                </div>
+                <label>Rotacija custom statusa (jedan tekst po redu, nasumično)</label>
+                <textarea class="field" data-f="rot_texts" rows="3" placeholder="Tekst 1&#10;Tekst 2&#10;Tekst 3">${esc(a.rot_texts)}</textarea>
+                <div class="row2">
+                    <input class="field" data-f="rot_minutes" type="number" min="0" max="1440" value="${a.rot_minutes || 0}" title="0 = bez rotacije">
+                    <label class="chk"><input type="checkbox" data-f="rot_status" ${a.rot_status ? 'checked' : ''}> i nasumični status (online / idle / ne ometaj)</label>
+                </div>
+                <small class="hint">Minute između izmjena (0 = isključeno).</small>
+            </details>
+            <details class="adv" data-k="sch" ${openAdv.has(a.id + ':sch') ? 'open' : ''}>
+                <summary>⏰ Raspored${a.schedules.length ? ' · ' + a.schedules.length + (a.schedules.length === 1 ? ' pravilo' : ' pravila') : ''}</summary>
+                <div class="sch-list">${a.schedules.map(s => `
+                    <div class="sch ${s.enabled ? '' : 'off'}" data-sid="${s.id}">
+                        <b class="mono">${s.at}</b>
+                        <span class="grow">${daysLabel(s.days)} → ${s.status ? `<i class="sd ${s.status}"></i>${ST[s.status]}` : ''}${s.status && s.set_text ? ' · ' : ''}${s.set_text ? (s.custom_status || s.emoji ? (s.emoji ? emojiHtml(s.emoji) + ' ' : '') + esc(s.custom_status) : '<i style="color:var(--muted)">bez teksta</i>') : ''}</span>
+                        <button class="btn ghost sm" data-a="sch_toggle" title="${s.enabled ? 'Isključi' : 'Uključi'}">${s.enabled ? '⏸' : '▶'}</button>
+                        <button class="btn red sm" data-a="sch_del" title="Obriši">✕</button>
+                    </div>`).join('') || '<small class="hint">Nema pravila. Dodaj prvo ispod.</small>'}</div>
+                <label>Novo pravilo · vrijeme po Hrvatskoj</label>
+                <div class="row2">
+                    <input class="field" type="time" data-s="at" value="08:00">
+                    <select class="field" data-s="status"><option value="">Status: ne mijenjaj</option>${Object.entries(ST).map(([k, v]) => `<option value="${k}">${v}</option>`).join('')}</select>
+                </div>
+                <div class="days">${DAYS.map((d, i) => `<label><input type="checkbox" data-s="day" value="${i}" checked><span>${d}</span></label>`).join('')}</div>
+                <label class="chk"><input type="checkbox" data-s="set_text"> promijeni i custom status</label>
+                <div class="row" style="grid-template-columns:1fr 64px 38px;margin-top:8px">
+                    <input class="field" data-s="custom_status" placeholder="Tekst (prazno = obriši tekst)">
+                    <input class="field" data-s="emoji" placeholder="😀" maxlength="80">
+                    <button class="btn ghost sm epick" data-a="e_pick" data-t='[data-s="emoji"]' title="Emoji sa servera (i animirani)">✨</button>
+                </div>
+                <button class="btn sm" data-a="sch_add" style="margin-top:10px;width:100%">+ Dodaj pravilo</button>
+            </details>
+            <div class="acts">
+                <button class="btn sm" data-a="save">Spremi</button>
+                <button class="btn ghost sm" data-a="${a.enabled ? 'disable' : 'enable'}">${a.enabled ? 'Isključi' : 'Uključi'}</button>
+                <button class="btn ghost sm" data-a="chat">💬 Poruke</button>
+                <button class="btn ghost sm" data-a="name">✏️ Ime</button>
+                <button class="btn ghost sm" data-a="restart">Restart</button>
+                <button class="btn ghost sm" data-a="token">Novi token</button>
+                <button class="btn red sm" data-a="delete">Obriši</button>
+            </div>
+        </div>`).join('');
+}
+
+$('#loginForm').addEventListener('submit', async e => {
+    e.preventDefault();
+    const d = await api('POST', '/login', { password: $('#pass').value });
+    if (d.ok) { $('#pass').value = ''; $('#loginErr').textContent = ''; showPanel(); } else $('#loginErr').textContent = d.msg || 'Greška.';
+});
+$('#logout').addEventListener('click', async () => { await api('POST', '/logout'); showLogin(); });
+$('#addForm').addEventListener('submit', async e => {
+    e.preventDefault();
+    const d = await api('POST', '/api/accounts', { token: $('#aToken').value, label: $('#aLabel').value, status: $('#aStatus').value, custom_status: $('#aText').value, emoji: $('#aEmoji').value });
+    toast(d.msg || (d.ok ? 'Dodano.' : 'Greška.'), !d.ok);
+    if (d.ok) { ['#aToken', '#aLabel', '#aText', '#aEmoji'].forEach(s => $(s).value = ''); load(); }
+});
+$('#list').addEventListener('toggle', e => {
+    const c = e.target.closest && e.target.closest('.acc');
+    if (!c || !e.target.matches('details')) return;
+    const key = c.dataset.id + ':' + (e.target.dataset.k || 'adv');
+    if (e.target.open) openAdv.add(key); else openAdv.delete(key);
+}, true);
+$('#list').addEventListener('focusin', e => { const c = e.target.closest('.acc'); if (c) editing = c.dataset.id; });
+// promijenjeno a nespremljeno - osvjezavanje bi vratilo stare vrijednosti
+['input', 'change'].forEach(ev => $('#list').addEventListener(ev, e => {
+    const c = e.target.closest('.acc');
+    if (c && e.target.matches('[data-f]')) { dirty.add(c.dataset.id); c.classList.add('dirty'); }
+    // novo pravila rasporeda u pripremi - ne osvjezavaj karticu dok se ne doda
+    if (c && e.target.matches('[data-s]')) {
+        dirty.add(c.dataset.id);
+        if (e.target.matches('[data-s="custom_status"], [data-s="emoji"]')) c.querySelector('[data-s="set_text"]').checked = true;
+    }
+}));
+$('#list').addEventListener('focusout', () => { setTimeout(() => { if (!document.activeElement.closest || !document.activeElement.closest('.acc')) editing = null; }, 50); });
+$('#list').addEventListener('click', async e => {
+    const b = e.target.closest('[data-a]'); if (!b) return;
+    const card = b.closest('.acc'), id = card.dataset.id, a = b.dataset.a;
+    let d;
+    if (a === 'chat') return openChat(id, card.querySelector('.who b').textContent);
+    if (a === 'v_pick') return openVoice(id, card.querySelector('.who b').textContent);
+    if (a === 'name') return openName(id, card.querySelector('.who b').textContent);
+    if (a === 'e_pick') return openEmoji(id, b.dataset.t);
+    if (a === 'v_mute' || a === 'v_deaf' || a === 'v_leave') {
+        const cur = ACCS.find(x => String(x.id) === id);
+        const body = a === 'v_leave' ? { channel_id: '' } : a === 'v_mute' ? { mute: !cur.voice.mute } : { deaf: !cur.voice.deaf };
+        d = await api('POST', `/api/accounts/${id}/voice`, body);
+        if (!d.ok || a === 'v_leave') toast(d.msg || 'Greška.', !d.ok);
+        load();
+        return;
+    }
+    if (a === 'sch_add') {
+        const s = f => card.querySelector(`[data-s="${f}"]`);
+        d = await api('POST', `/api/accounts/${id}/schedules`, {
+            at: s('at').value, status: s('status').value, set_text: s('set_text').checked,
+            custom_status: s('custom_status').value, emoji: s('emoji').value,
+            days: [...card.querySelectorAll('[data-s="day"]:checked')].map(x => x.value).join(''),
+        });
+        if (d.ok && !card.classList.contains('dirty')) dirty.delete(id);
+        toast(d.msg || (d.ok ? 'Dodano.' : 'Greška.'), !d.ok);
+        if (d.ok) load();
+        return;
+    }
+    if (a === 'sch_toggle' || a === 'sch_del') {
+        const sid = b.closest('[data-sid]').dataset.sid;
+        if (a === 'sch_del' && !confirm('Obrisati pravilo?')) return;
+        d = a === 'sch_del' ? await api('DELETE', `/api/schedules/${sid}`) : await api('POST', `/api/schedules/${sid}/toggle`);
+        if (!d.ok) toast(d.msg || 'Greška.', true);
+        if (!card.classList.contains('dirty')) dirty.delete(id);
+        load();
+        return;
+    }
+    if (a === 'save') {
+        const v = f => card.querySelector(`[data-f="${f}"]`).value;
+        d = await api('PUT', `/api/accounts/${id}`, { status: v('status'), custom_status: v('custom_status'), emoji: v('emoji'),
+            platform: v('platform'), act_type: v('act_type'), act_name: v('act_name'), rot_texts: v('rot_texts'),
+            rot_minutes: v('rot_minutes'), rot_status: card.querySelector('[data-f="rot_status"]').checked });
+    } else if (a === 'token') {
+        const t = prompt('Novi token za ovaj račun (stari prestane vrijediti kad se odjaviš iz Discorda):');
+        if (!t) return;
+        d = await api('PUT', `/api/accounts/${id}/token`, { token: t });
+    } else if (a === 'delete') {
+        if (!confirm('Obrisati ovaj račun iz panela?')) return;
+        d = await api('DELETE', `/api/accounts/${id}`);
+    } else d = await api('POST', `/api/accounts/${id}/${a}`);
+    editing = null;
+    if (d.ok || a === 'delete') dirty.delete(id);
+    toast(d.msg || (d.ok ? 'Gotovo.' : 'Greška.'), !d.ok);
+    load();
+});
+// osvjezi stanje svakih 5 s (ne dok nesto uredjujes)
+setInterval(() => { if (!$('#panel').classList.contains('hide') && $('#chat').classList.contains('hide') && !editing && !dirty.size) load(); }, 5000);
+
+// ---------- voice ----------
+const V = { acc: null };
+async function openVoice(aid, name) {
+    const acc = ACCS.find(x => String(x.id) === String(aid));
+    if (!acc || acc.state !== 'online') return toast('Račun nije spojen - uključi ga pa probaj opet.', true);
+    V.acc = aid;
+    $('#vWho').textContent = name;
+    $('#vMute').checked = acc.voice.mute; $('#vDeaf').checked = acc.voice.deaf;
+    $('#vGuild').innerHTML = '<option value="">Učitavanje…</option>';
+    $('#vChan').innerHTML = '<option value="">— prvo odaberi server —</option>';
+    $('#vModal').classList.remove('hide');
+    const d = await api('GET', `/api/chat/${aid}/guilds`);
+    if (!d.ok) { $('#vModal').classList.add('hide'); return toast(d.msg || 'Greška.', true); }
+    $('#vGuild').innerHTML = '<option value="">— odaberi server —</option>' + d.guilds.map(g => `<option value="${g.id}">${esc(g.name)}</option>`).join('');
+    if (acc.voice.guild) { $('#vGuild').value = acc.voice.guild; await loadVoiceChannels(acc.voice.channel); }
+}
+async function loadVoiceChannels(select) {
+    const gid = $('#vGuild').value;
+    if (!gid) { $('#vChan').innerHTML = '<option value="">— prvo odaberi server —</option>'; return; }
+    $('#vChan').innerHTML = '<option value="">Učitavanje…</option>';
+    const d = await api('GET', `/api/chat/${V.acc}/guilds/${gid}/voice`);
+    if (gid !== $('#vGuild').value) return;
+    if (!d.ok) { $('#vChan').innerHTML = `<option value="">${esc(d.msg)}</option>`; return; }
+    let cat = null, html = '<option value="">— odaberi kanal —</option>';
+    for (const c of d.channels) {
+        if (c.cat !== cat) { if (cat !== null) html += '</optgroup>'; cat = c.cat; html += `<optgroup label="${esc(cat || 'Bez kategorije')}">`; }
+        html += `<option value="${c.id}" ${c.can ? '' : 'disabled'}>${c.stage ? '🎭' : '🔊'} ${esc(c.name)}${c.limit ? ` (max ${c.limit})` : ''}${c.can ? '' : ' 🔒'}</option>`;
+    }
+    if (cat !== null) html += '</optgroup>';
+    $('#vChan').innerHTML = d.channels.length ? html : '<option value="">Nema glasovnih kanala</option>';
+    if (select) $('#vChan').value = select;
+}
+$('#vGuild').addEventListener('change', () => loadVoiceChannels());
+$('#vNo').addEventListener('click', () => $('#vModal').classList.add('hide'));
+$('#vGo').addEventListener('click', async () => {
+    const gid = $('#vGuild').value, cid = $('#vChan').value;
+    if (!gid || !cid) return toast('Odaberi server i kanal.', true);
+    const name = $('#vGuild').selectedOptions[0].textContent + ' · ' + $('#vChan').selectedOptions[0].textContent.replace(/^\S+\s/, '');
+    const d = await api('POST', `/api/accounts/${V.acc}/voice`, { guild_id: gid, channel_id: cid, name, mute: $('#vMute').checked, deaf: $('#vDeaf').checked });
+    toast(d.msg || (d.ok ? 'Gotovo.' : 'Greška.'), !d.ok);
+    if (d.ok) { $('#vModal').classList.add('hide'); load(); }
+});
+
+// ---------- emoji ----------
+// custom emoji se sprema u Discord obliku <:ime:id> / <a:ime:id> (a = animiran)
+function emojiHtml(s) {
+    const m = /^<(a?):(\w+):(\d+)>$/.exec((s || '').trim());
+    if (!m) return esc(s);
+    return `<img class="cemoji" src="https://cdn.discordapp.com/emojis/${m[3]}.${m[1] ? 'gif' : 'png'}?size=48" alt=":${esc(m[2])}:" title=":${esc(m[2])}:">`;
+}
+const E = { acc: null, sel: null, guilds: null };
+async function openEmoji(aid, sel) {
+    E.acc = aid; E.sel = sel;
+    dirty.add(aid);                          // dok je birac otvoren, kartica se ne osvjezava
+    $('#eGrid').innerHTML = '';
+    $('#eGuild').innerHTML = '<option value="">Učitavanje…</option>';
+    $('#eModal').classList.remove('hide');
+    const d = await api('GET', `/api/chat/${aid}/guilds`);
+    if (!d.ok) { closeEmoji(); return toast(d.msg || 'Greška.', true); }
+    $('#eGuild').innerHTML = '<option value="">— odaberi server —</option>' + d.guilds.map(g => `<option value="${g.id}">${esc(g.name)}</option>`).join('');
+}
+async function loadEmojis() {
+    const gid = $('#eGuild').value;
+    $('#eGrid').innerHTML = gid ? '<small class="hint">Učitavanje…</small>' : '';
+    if (!gid) return;
+    const d = await api('GET', `/api/chat/${E.acc}/guilds/${gid}/emojis`);
+    if (gid !== $('#eGuild').value) return;
+    if (!d.ok) { $('#eGrid').innerHTML = `<small class="hint">${esc(d.msg)}</small>`; return; }
+    const list = d.emojis.sort((x, y) => y.animated - x.animated);
+    $('#eGrid').innerHTML = list.map(x => `<button data-e="&lt;${x.animated ? 'a' : ''}:${esc(x.name)}:${x.id}&gt;" title=":${esc(x.name)}:${x.animated ? ' (animiran)' : ''}"><img src="https://cdn.discordapp.com/emojis/${x.id}.${x.animated ? 'gif' : 'png'}?size=64" loading="lazy"></button>`).join('')
+        || '<small class="hint">Ovaj server nema svojih emojija.</small>';
+}
+function setEmoji(val) {
+    const card = document.querySelector(`.acc[data-id="${E.acc}"]`);
+    const input = card && card.querySelector(E.sel);
+    if (input) { input.value = val; input.dispatchEvent(new Event('input', { bubbles: true })); }
+    closeEmoji();
+}
+function closeEmoji() {
+    $('#eModal').classList.add('hide');
+    const card = document.querySelector(`.acc[data-id="${E.acc}"]`);
+    // nista nije promijenjeno na kartici - smije se opet osvjezavati
+    if (card && !card.classList.contains('dirty') && E.sel !== '[data-s="emoji"]') dirty.delete(E.acc);
+}
+$('#eGuild').addEventListener('change', loadEmojis);
+$('#eGrid').addEventListener('click', e => { const b = e.target.closest('[data-e]'); if (b) setEmoji(b.dataset.e); });
+$('#eClear').addEventListener('click', () => setEmoji(''));
+$('#eClose').addEventListener('click', closeEmoji);
+
+// ---------- ime racuna ----------
+const N = { acc: null };
+async function openName(aid, label) {
+    N.acc = aid;
+    $('#nWho').textContent = label;
+    ['#nGlobal', '#nNick', '#nUser', '#nPass'].forEach(s => $(s).value = '');
+    $('#nGuild').innerHTML = '<option value="">Učitavanje…</option>';
+    $('#nModal').classList.remove('hide');
+    const [me, g] = await Promise.all([api('GET', `/api/chat/${aid}/me`), api('GET', `/api/chat/${aid}/guilds`)]);
+    if (!me.ok) { $('#nModal').classList.add('hide'); return toast(me.msg || 'Greška.', true); }
+    $('#nGlobal').value = me.global_name; $('#nUser').value = me.username;
+    $('#nGuild').innerHTML = g.ok ? '<option value="">— odaberi server —</option>' + g.guilds.map(x => `<option value="${x.id}">${esc(x.name)}</option>`).join('') : `<option value="">${esc(g.msg)}</option>`;
+}
+async function nameCall(btn, url, body, after) {
+    btn.disabled = true;
+    const d = await api('POST', url, body);
+    btn.disabled = false;
+    toast(d.msg || (d.ok ? 'Gotovo.' : 'Greška.'), !d.ok);
+    if (d.ok) { if (after) after(); load(); }
+}
+$('#nGlobalSave').addEventListener('click', e => nameCall(e.target, `/api/chat/${N.acc}/name`, { global_name: $('#nGlobal').value }));
+$('#nNickSave').addEventListener('click', e => {
+    if (!$('#nGuild').value) return toast('Odaberi server.', true);
+    nameCall(e.target, `/api/chat/${N.acc}/guilds/${$('#nGuild').value}/nick`, { nick: $('#nNick').value });
+});
+$('#nUserSave').addEventListener('click', e => {
+    if (!$('#nPass').value) return toast('Upiši lozinku računa.', true);
+    nameCall(e.target, `/api/chat/${N.acc}/username`, { username: $('#nUser').value, password: $('#nPass').value }, () => $('#nPass').value = '');
+});
+$('#nClose').addEventListener('click', () => { $('#nPass').value = ''; $('#nModal').classList.add('hide'); });
+
+// ---------- poruke ----------
+const C = { acc: null, guild: null, chan: null, reply: null, sig: '', typing: 0, timer: null, msgs: [], channels: [], all: false };
+try { C.all = localStorage.getItem('chatAll') === '1'; } catch (e) {}
+const QUICK = ['👍', '❤️', '😂', '🔥'];
+
+async function openChat(aid, name) {
+    Object.assign(C, { acc: aid, guild: null, chan: null, reply: null, sig: '', msgs: [] });
+    $('#cWho').textContent = 'kao ' + name;
+    $('#chat').classList.remove('hide', 'inch');
+    $('#cMsgs').innerHTML = '<div class="cempty">Odaberi server i kanal lijevo.</div>';
+    $('#cName').textContent = 'Odaberi kanal';
+    setCompose(false); setReply(null);
+    const d = await api('GET', `/api/chat/${aid}/guilds`);
+    if (!d.ok) { toast(d.msg || 'Greška.', true); return; }
+    $('#cRail').innerHTML = `<div class="gicon" data-g="@me" title="Privatne poruke">💬</div><hr>` + d.guilds.map(g =>
+        `<div class="gicon" data-g="${g.id}" title="${esc(g.name)}">${g.icon ? `<img src="${g.icon}">` : esc(g.name.split(/\s+/).map(w => w[0]).join('').slice(0, 3))}</div>`).join('');
+    pickGuild('@me');
+}
+function closeChat() { $('#chat').classList.add('hide'); C.acc = null; clearInterval(C.timer); load(); }
+function setCompose(on) { $('#cInput').disabled = $('#cSend').disabled = !on; }
+function setReply(m) {
+    C.reply = m ? m.id : null;
+    $('#cReply').classList.toggle('hide', !m);
+    if (m) { $('#cReply span').innerHTML = `Odgovaraš <b>${esc(m.author.name)}</b>: ${esc(m.content.slice(0, 80))}`; $('#cInput').focus(); }
+}
+
+async function pickGuild(gid) {
+    C.guild = gid; C.channels = [];
+    $('#cBackup').classList.toggle('hide', gid === '@me');
+    $('#cMode').classList.toggle('hide', gid === '@me');
+    document.querySelectorAll('.gicon').forEach(e => e.classList.toggle('on', e.dataset.g === gid));
+    $('#cList').innerHTML = '<div class="hint" style="padding:10px">Učitavanje…</div>';
+    if (gid === '@me') {
+        $('#cTitle').textContent = 'Privatne poruke';
+        const d = await api('GET', `/api/chat/${C.acc}/dms`);
+        if (C.guild !== gid) return;
+        if (!d.ok) { $('#cList').innerHTML = `<div class="hint" style="padding:10px">${esc(d.msg)}</div>`; return; }
+        $('#cList').innerHTML = d.dms.map(c => `<div class="ch" data-c="${c.id}">${c.avatar ? `<img src="${c.avatar}">` : '👥'} ${esc(c.name)}</div>`).join('') || '<div class="hint" style="padding:10px">Nema privatnih poruka.</div>';
+        return;
+    }
+    $('#cTitle').textContent = document.querySelector(`.gicon[data-g="${gid}"]`).title;
+    const d = await api('GET', `/api/chat/${C.acc}/guilds/${gid}/channels`);
+    if (C.guild !== gid) return;
+    if (!d.ok) { $('#cList').innerHTML = `<div class="hint" style="padding:10px">${esc(d.msg)}</div>`; return; }
+    C.channels = d.channels;
+    renderChannels();
+}
+function renderChannels() {
+    let cat = null, html = '', hidden = 0;
+    for (const c of C.channels || []) {
+        if (!c.view) hidden++;
+        if (!c.view && !C.all) continue;
+        if (c.cat !== cat) { cat = c.cat; if (cat) html += `<div class="cat">${esc(cat)}</div>`; }
+        html += `<div class="ch ${c.view ? '' : 'locked'} ${c.id === C.chan ? 'on' : ''}" data-c="${c.id}" ${c.view ? '' : 'title="Nemaš pristup ovom kanalu"'}>${c.view ? (c.type === 5 ? '📢' : c.type === 15 ? '🗂️' : '#') : '🔒'} ${esc(c.name)}</div>`;
+    }
+    $('#cMode button[data-v="1"]').textContent = `Svi kanali${hidden ? ' (+' + hidden + ')' : ''}`;
+    $('#cList').innerHTML = html || '<div class="hint" style="padding:10px">Nema kanala.</div>';
+}
+
+async function pickChannel(el) {
+    C.chan = el.dataset.c; C.sig = ''; setReply(null);
+    document.querySelectorAll('.ch').forEach(e => e.classList.toggle('on', e === el));
+    $('#cName').textContent = el.textContent.trim();
+    $('#chat').classList.add('inch');
+    $('#cMsgs').innerHTML = '<div class="cempty">Učitavanje…</div>';
+    setCompose(true);
+    await loadMsgs(true);
+    clearInterval(C.timer);
+    C.timer = setInterval(() => { if (C.acc && C.chan && !document.hidden) loadMsgs(false); }, 3000);
+}
+
+function fmtTime(ts) {
+    const d = new Date(ts), now = new Date();
+    const t = d.toLocaleTimeString('hr-HR', { hour: '2-digit', minute: '2-digit' });
+    return d.toDateString() === now.toDateString() ? 'danas ' + t : d.toLocaleDateString('hr-HR') + ' ' + t;
+}
+
+async function loadMsgs(force) {
+    const chan = C.chan;
+    const d = await api('GET', `/api/chat/${C.acc}/channels/${chan}/messages`);
+    if (chan !== C.chan) return;
+    if (!d.ok) { if (force) { $('#cMsgs').innerHTML = `<div class="cempty">${esc(d.msg)}</div>`; setCompose(false); } return; }
+    const sig = JSON.stringify(d.messages);
+    if (!force && sig === C.sig) return;
+    C.sig = sig; C.msgs = d.messages;
+    const box = $('#cMsgs'), atBottom = force || box.scrollHeight - box.scrollTop - box.clientHeight < 80;
+    box.innerHTML = d.messages.map(m => `
+        <div class="msg" data-m="${m.id}">
+            <img src="${m.author.avatar}">
+            <div>
+                ${m.reply ? `<div class="rep"><b>${esc(m.reply.name)}</b> ${esc(m.reply.content)}</div>` : ''}
+                <div class="meta"><b>${esc(m.author.name)}</b>${m.author.bot ? '<i>BOT</i>' : ''}<span>${fmtTime(m.ts)}</span></div>
+                <div class="txt">${esc(m.content)}${m.edited ? ' <small>(uređeno)</small>' : ''}</div>
+                ${m.attachments.map(f => `<div class="att">${f.image ? `<a href="${esc(f.url)}" target="_blank"><img src="${esc(f.url)}"></a>` : `<a href="${esc(f.url)}" target="_blank">📎 ${esc(f.name)}</a>`}</div>`).join('')}
+                ${m.embeds.map(e => `<div class="emb">${e.title ? `<b>${esc(e.title)}</b>\n` : ''}${esc(e.description)}${e.image ? `<img src="${esc(e.image)}" style="max-width:100%;border-radius:6px;margin-top:6px;display:block">` : ''}</div>`).join('')}
+                ${m.reactions.length ? `<div class="reacts">${m.reactions.map(r => `<span class="react ${r.me ? 'me' : ''}" data-r="${esc(r.emoji)}" data-rid="${r.id || ''}" data-me="${r.me ? 1 : ''}">${r.id ? ':' + esc(r.emoji) + ':' : esc(r.emoji)} ${r.count}</span>`).join('')}</div>` : ''}
+                <div class="mtools">
+                    <button data-t="reply" title="Odgovori">↩️</button>
+                    ${QUICK.map(e => `<button data-t="q" data-e="${e}">${e}</button>`).join('')}
+                    <button data-t="react" title="Druga reakcija">＋</button>
+                    ${m.mine ? '<button data-t="edit" title="Uredi">✏️</button><button data-t="del" title="Obriši">🗑️</button>' : ''}
+                </div>
+            </div>
+        </div>`).join('') || '<div class="cempty">Još nema poruka u ovom kanalu.</div>';
+    if (atBottom) box.scrollTop = box.scrollHeight;
+}
+
+async function send() {
+    const t = $('#cInput').value.trim();
+    if (!t || !C.chan) return;
+    $('#cSend').disabled = true;
+    const d = await api('POST', `/api/chat/${C.acc}/channels/${C.chan}/messages`, { content: t, reply_to: C.reply });
+    $('#cSend').disabled = false;
+    if (!d.ok) { toast(d.msg || 'Poruka nije poslana.', true); return; }
+    $('#cInput').value = ''; autoGrow(); setReply(null); C.typing = 0;
+    loadMsgs(true);
+}
+async function react(mid, emoji, id, remove) {
+    const d = await api('POST', `/api/chat/${C.acc}/channels/${C.chan}/messages/${mid}/react`, { emoji, id: id || null, remove: !!remove });
+    if (!d.ok) toast(d.msg || 'Greška.', true); else loadMsgs(false);
+}
+function autoGrow() { const t = $('#cInput'); t.style.height = 'auto'; t.style.height = Math.min(t.scrollHeight + 2, 160) + 'px'; }
+
+$('#cRail').addEventListener('click', e => { const g = e.target.closest('[data-g]'); if (g) { $('#chat').classList.remove('inch'); pickGuild(g.dataset.g); } });
+$('#cList').addEventListener('click', e => { const c = e.target.closest('[data-c]'); if (c) pickChannel(c); });
+$('#cClose').addEventListener('click', closeChat);
+function setMode(all) {
+    C.all = all;
+    try { localStorage.setItem('chatAll', all ? '1' : '0'); } catch (e) {}
+    document.querySelectorAll('#cMode button').forEach(b => b.classList.toggle('on', (b.dataset.v === '1') === all));
+    renderChannels();
+}
+$('#cMode').addEventListener('click', e => { const b = e.target.closest('[data-v]'); if (b) setMode(b.dataset.v === '1'); });
+setMode(C.all);
+$('#cBackup').addEventListener('click', async () => {
+    if (!C.guild || C.guild === '@me') return;
+    $('#cBackup').disabled = true;
+    try {
+        const r = await fetch(`/api/chat/${C.acc}/guilds/${C.guild}/backup`, { credentials: 'same-origin' });
+        if (!r.ok) { let d = {}; try { d = await r.json(); } catch (e) {} toast(d.msg || 'Backup nije uspio.', true); return; }
+        const data = await r.json();
+        const name = ($('#cTitle').textContent || 'server').replace(/[^\w\-]+/g, '_');
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(new Blob([JSON.stringify(data, null, 1)], { type: 'application/json' }));
+        a.download = `backup-${name}.json`; a.click();
+        toast(`Backup: ${data.roles.length} rangova, ${data.categories.length} kategorija, ${data.channels.length} kanala (preskočeno tiketa: ${data.skipped_tickets}).`);
+    } finally { $('#cBackup').disabled = false; }
+});
+
+// ---------- uvoz backupa (racun iz panela) ----------
+$('.imp').addEventListener('toggle', async e => {
+    if (!e.target.open) return;
+    const d = await api('GET', '/api/accounts');
+    if (!d.ok) return;
+    const cur = $('#iAcc').value;
+    $('#iAcc').innerHTML = '<option value="">— odaberi račun —</option>' + d.accounts.map(a =>
+        `<option value="${a.id}" ${String(a.id) === cur ? 'selected' : ''}>${esc(a.label || a.username)}</option>`).join('');
+});
+$('#iAcc').addEventListener('change', async () => {
+    const aid = $('#iAcc').value;
+    $('#iGuild').innerHTML = '<option value="">Učitavanje…</option>';
+    if (!aid) { $('#iGuild').innerHTML = '<option value="">— prvo odaberi račun —</option>'; return; }
+    const d = await api('GET', `/api/chat/${aid}/guilds`);
+    if (!d.ok) { $('#iGuild').innerHTML = ''; return toast(d.msg || 'Greška.', true); }
+    $('#iGuild').innerHTML = '<option value="">— odaberi server —</option>' + d.guilds.map(g => `<option value="${g.id}">${esc(g.name)}</option>`).join('');
+});
+$('#iStart').addEventListener('click', async () => {
+    const f = $('#iFile').files[0];
+    if (!f) return toast('Odaberi backup datoteku.', true);
+    if (!$('#iAcc').value || !$('#iGuild').value) return toast('Odaberi račun i svoj server.', true);
+    let data;
+    try { data = JSON.parse(await f.text()); } catch (e) { return toast('Datoteka nije ispravan backup.', true); }
+    const gname = $('#iGuild').selectedOptions[0].textContent;
+    const mode = $('#iMode').value;
+    const ask = mode === 'colors'
+        ? `Na serveru "${gname}" obojati rangove koji se zovu isto kao u backupu? Ništa se neće stvoriti ni obrisati.`
+        : `Na server "${gname}" dodati ${data.roles?.length || 0} rangova, ${data.categories?.length || 0} kategorija i ${data.channels?.length || 0} kanala?`;
+    if (!confirm(ask)) return;
+    const d = await api('POST', '/api/clone/import', { account_id: $('#iAcc').value, guild_id: $('#iGuild').value, data, mode });
+    if (!d.ok) return toast(d.msg || 'Greška.', true);
+    $('#iStart').disabled = true;
+    const log = $('#iLog'); log.classList.remove('hide');
+    const poll = setInterval(async () => {
+        const s = await api('GET', `/api/clone/import/${d.job}`);
+        if (!s.ok) { clearInterval(poll); $('#iStart').disabled = false; return; }
+        log.textContent = s.log.join('\n'); log.scrollTop = log.scrollHeight;
+        if (s.done) { clearInterval(poll); $('#iStart').disabled = false; toast('Uvoz gotov.'); }
+    }, 1500);
+});
+// ---------- ulazak na server (OAuth guilds.join) ----------
+async function loadJoinUsers() {
+    const d = await api('GET', '/api/join/users');
+    if (!d.ok) return;
+    $('#jUsers').innerHTML = d.users.map(u => `
+        <div class="sch" data-u="${u.id}">
+            <img src="${u.avatar ? `https://cdn.discordapp.com/avatars/${u.id}/${u.avatar}.png?size=64` : `https://cdn.discordapp.com/embed/avatars/${(Number(u.id) >> 22) % 6}.png`}" style="width:24px;height:24px;border-radius:50%">
+            <span class="grow">${esc(u.name)}${u.panel ? ` <span class="hint">· u panelu: ${esc(u.panel)}</span>` : ''}</span>
+            <button class="btn sm" data-j="add">Ubaci</button>
+            <button class="btn red sm" data-j="del" title="Obriši autorizaciju iz panela">✕</button>
+        </div>`).join('') || '<p class="hint">Još nitko nije autoriziran - otvori link iz koraka 1 s računom.</p>';
+}
+$('#join').addEventListener('toggle', async e => {
+    if (!e.target.open) return;
+    const c = await api('GET', '/api/join/config');
+    if (!c.ok) return;
+    $('#jSetup').classList.toggle('hide', c.ready);
+    $('#jReady').classList.toggle('hide', !c.ready);
+    if (!c.ready) return;
+    $('#jUrl').value = c.url;
+    $('#jRedirect').textContent = c.redirect;
+    const g = await api('GET', '/api/join/guilds');
+    const cur = $('#jGuild').value;
+    $('#jGuild').innerHTML = g.ok
+        ? '<option value="">— odaberi server —</option>' + g.guilds.map(x => `<option value="${x.id}" ${x.id === cur ? 'selected' : ''}>${esc(x.name)}</option>`).join('')
+        : `<option value="">${esc(g.msg || 'Greška.')}</option>`;
+    loadJoinUsers();
+});
+$('#jCopy').addEventListener('click', async () => {
+    try { await navigator.clipboard.writeText($('#jUrl').value); toast('Link kopiran.'); }
+    catch (e) { $('#jUrl').select(); toast('Kopiraj link ručno (Ctrl+C).', true); }
+});
+$('#jRefresh').addEventListener('click', loadJoinUsers);
+$('#jUsers').addEventListener('click', async e => {
+    const b = e.target.closest('[data-j]'); if (!b) return;
+    const uid = b.closest('[data-u]').dataset.u;
+    if (b.dataset.j === 'del') {
+        if (!confirm('Obrisati autorizaciju tog računa iz panela?')) return;
+        const d = await api('DELETE', `/api/join/users/${uid}`);
+        toast(d.msg || 'Greška.', !d.ok); return loadJoinUsers();
+    }
+    if (!$('#jGuild').value) return toast('Odaberi server.', true);
+    b.disabled = true;
+    const d = await api('POST', '/api/join/add', { user_id: uid, guild_id: $('#jGuild').value });
+    b.disabled = false;
+    toast(d.msg || 'Greška.', !d.ok);
+});
+$('#cBack').addEventListener('click', () => $('#chat').classList.remove('inch'));
+$('#cReplyX').addEventListener('click', () => setReply(null));
+$('#cSend').addEventListener('click', send);
+$('#cInput').addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); } });
+$('#cInput').addEventListener('input', () => {
+    autoGrow();
+    // "piše..." - Discord ga drzi ~10 s, ne salji cesce od svakih 8 s
+    if ($('#cInput').value && Date.now() - C.typing > 8000) { C.typing = Date.now(); api('POST', `/api/chat/${C.acc}/channels/${C.chan}/typing`); }
+});
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && !$('#chat').classList.contains('hide')) { if (C.reply) setReply(null); else closeChat(); } });
+$('#cMsgs').addEventListener('click', async e => {
+    const msgEl = e.target.closest('[data-m]'); if (!msgEl) return;
+    const m = C.msgs.find(x => x.id === msgEl.dataset.m); if (!m) return;
+    const r = e.target.closest('.react');
+    if (r) return react(m.id, r.dataset.r, r.dataset.rid, r.dataset.me === '1');
+    const b = e.target.closest('[data-t]'); if (!b) return;
+    const t = b.dataset.t;
+    if (t === 'reply') setReply(m);
+    else if (t === 'q') react(m.id, b.dataset.e);
+    else if (t === 'react') { const em = prompt('Emoji za reakciju (npr. 😎):'); if (em) react(m.id, em.trim()); }
+    else if (t === 'edit') {
+        const nt = prompt('Uredi poruku:', m.content); if (nt == null || !nt.trim() || nt === m.content) return;
+        const d = await api('PATCH', `/api/chat/${C.acc}/channels/${C.chan}/messages/${m.id}`, { content: nt });
+        if (!d.ok) toast(d.msg || 'Greška.', true); else loadMsgs(true);
+    } else if (t === 'del') {
+        if (!confirm('Obrisati poruku?')) return;
+        const d = await api('DELETE', `/api/chat/${C.acc}/channels/${C.chan}/messages/${m.id}`);
+        if (!d.ok) toast(d.msg || 'Greška.', true); else loadMsgs(true);
+    }
+});
+api('GET', '/api/accounts').then(d => d.ok ? showPanel() : showLogin());
+</script>
+</body>
+</html>

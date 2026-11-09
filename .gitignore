@@ -1,0 +1,9 @@
+# postavke s lozinkama / tokenima - nikad na GitHub
+config.json
+*.db
+venv/
+__pycache__/
+*.pyc
+node_modules/
+.wrangler/
+.dev.vars
